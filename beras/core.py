@@ -203,7 +203,10 @@ class Diffable(Callable, Weighted):
             for layer_input, inp_grad in zip(self.inputs, self.get_input_gradients()):
                 j_wrt_lay_inp = np.zeros(layer_input.shape, dtype=inp_grad.dtype)
                 for sample in range(batch_size):
-                    s_grad = inp_grad[sample] if len(inp_grad.shape) == 3 else inp_grad
+                    if inp_grad.shape[0] == batch_size:
+                        s_grad = inp_grad[sample]
+                    else:
+                        s_grad = inp_grad
                     try:
                         j_wrt_lay_inp[sample] = s_grad @ upstream_jacobian[sample]
                     except ValueError as e:
@@ -236,9 +239,10 @@ class Diffable(Callable, Weighted):
                 j_wrt_lay_w = np.zeros((batch_size, *layer_w.shape), dtype=w_grad.dtype)
                 ## For every element in the batch (for a single batch-level gradient updates)
                 for sample in range(batch_size):
-                    ## If the weight gradient is a batch of transform matrices, get the right entry.
-                    ## Allows gradient methods to give either batched or non-batched matrices
-                    s_grad = w_grad[sample] if len(w_grad.shape) == 3 else w_grad
+                    if w_grad.shape[0] == batch_size:
+                        s_grad = w_grad[sample]
+                    else:
+                        s_grad = w_grad
                     ## Update the batch's Jacobian update contribution
                     try:
                         j_wrt_lay_w[sample] = s_grad * upstream_jacobian[sample]

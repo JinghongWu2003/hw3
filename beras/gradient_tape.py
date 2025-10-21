@@ -42,33 +42,60 @@ class GradientTape:
 
         # What tensor and what gradient is for you to implement!
         # compose_input_gradients and compose_weight_gradients are methods that will be helpful
-        grads[id(target)] = np.ones_like(target)
+        grads[id(target)] = np.ones_like(np.asarray(target))
+
+        visited = set()
+
         while queue:
             out_tensor = queue.pop(0)
+            if id(out_tensor) in visited:
+                continue
+            visited.add(id(out_tensor))
+
             layer = self.previous_layers[id(out_tensor)]
             if layer is None:
                 continue
+
             upstream_grads = grads[id(out_tensor)]
-            print("type of upstream:", type(upstream_grads), "shape:", np.shape(upstream_grads))
+            if upstream_grads is None:
+                continue
+
+            upstream_grads = np.asarray(upstream_grads)
+
+            if layer.inputs:
+                expected_batch = layer.inputs[0].shape[0]
+            elif layer.outputs:
+                expected_batch = layer.outputs[0].shape[0]
+            else:
+                expected_batch = upstream_grads.shape[0] if upstream_grads.ndim > 0 else 1
+
+            if upstream_grads.ndim == 0:
+                upstream_grads = np.ones((expected_batch,), dtype=upstream_grads.dtype)
+            elif upstream_grads.shape[0] != expected_batch:
+                upstream_grads = np.broadcast_to(upstream_grads, (expected_batch, *upstream_grads.shape[1:]))
 
             weight_grads = layer.compose_weight_gradients([upstream_grads])
             for w, wg in zip(layer.weights, weight_grads):
                 if grads[id(w)] is None:
-                    grads[id(w)] = wg.copy()
+                    grads[id(w)] = np.array(wg, copy=True)
                 else:
                     grads[id(w)] += wg
 
             input_grads = layer.compose_input_gradients([upstream_grads])
             for inp, ig in zip(layer.inputs, input_grads):
                 if grads[id(inp)] is None:
-                    grads[id(inp)] = ig.copy()
+                    grads[id(inp)] = np.array(ig, copy=True)
                 else:
                     grads[id(inp)] += ig
                 queue.append(inp)
 
-        final_grads = [
-            grads.get(id(src), np.zeros_like(src)) for src in sources
-        ]
+        final_grads = []
+        for src in sources:
+            grad = grads.get(id(src))
+            if grad is None:
+                grad = np.zeros_like(src)
+            final_grads.append(Tensor(grad))
+
         return final_grads
 
 
