@@ -160,13 +160,11 @@ class SequentialModel(Model):
             loss_val = self.compiled_loss(y_pred, y)
 
         grads = tape.gradient(loss_val, self.weights)
-        grad_norms = [np.linalg.norm(g) if g is not None else 0 for g in grads]
-        print("grad norms:", grad_norms)
 
         if training:
-            ws_before = [w.copy() for w in self.weights]
-            self.optimizer.apply_gradients(self.weights, grads)
-            deltas = [np.linalg.norm(w - wb) for w, wb in zip(self.weights, ws_before)]
-            print("weight deltas:", deltas)
-        acc_val = self.compiled_acc.forward(y_pred, y)
+            trainable_weights = [w for w in self.weights if w.trainable]
+            trainable_grads = [g for w, g in zip(self.weights, grads) if w.trainable]
+            self.optimizer.apply_gradients(trainable_weights, trainable_grads)
+
+        acc_val = self.compiled_acc(y_pred, y)
         return {"loss": float(loss_val), "acc": float(acc_val)}

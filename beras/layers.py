@@ -22,14 +22,16 @@ class Dense(Diffable):
         return x @ self.w + self.b
 
     def get_input_gradients(self) -> list[Tensor]:
-        grad_x = self.w.T
-        return [grad_x]
+        return [Tensor(self.w.T)]
 
     def get_weight_gradients(self) -> list[Tensor]:
         x = self.inputs[0]
-        grad_w = x
-        grad_b = np.ones_like(self.b)
-        return [grad_w, grad_b]
+        batch_size = x.shape[0]
+
+        grad_w = np.expand_dims(x, axis=2)
+        grad_b = np.ones((batch_size, self.b.shape[0]), dtype=self.b.dtype)
+
+        return [Tensor(grad_w), Tensor(grad_b)]
 
     @staticmethod
     def _initialize_weight(initializer, input_size, output_size) -> tuple[Variable, Variable]:
@@ -59,15 +61,16 @@ class Dense(Diffable):
         ), f"Unknown dense weight initialization strategy '{initializer}' requested"
 
         if initializer == "zero":
-            W = np.zeros((input_size, output_size))
+            W = np.zeros((input_size, output_size), dtype=np.float32)
         elif initializer == "normal":
-            W = np.random.normal(0, 1, size=(input_size, output_size))
+            W = np.random.normal(0, 1, size=(input_size, output_size)).astype(np.float32)
         elif initializer == "xavier":
-            std = np.sqrt(2. / (input_size + output_size))
-            W = np.random.normal(0, std, size=(input_size, output_size))
+            std = np.sqrt(2.0 / (input_size + output_size))
+            W = np.random.normal(0, std, size=(input_size, output_size)).astype(np.float32)
         elif initializer == "kaiming":
-            std = np.sqrt(2. / input_size)
-            W = np.random.normal(0, std, size=(input_size, output_size))
-        b = np.zeros((output_size,))
+            std = np.sqrt(2.0 / input_size)
+            W = np.random.normal(0, std, size=(input_size, output_size)).astype(np.float32)
+
+        b = np.zeros((output_size,), dtype=np.float32)
 
         return Variable(W), Variable(b)
